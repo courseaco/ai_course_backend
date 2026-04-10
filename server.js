@@ -1,5 +1,6 @@
 //IMPORT
 const express = require('express');
+const path = require('path');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer')
@@ -20,9 +21,9 @@ const flw = new Flutterwave(process.env.FLUTTERWAVE_PUBLIC_KEY, process.env.FLUT
 //INITIALIZE
 const app = express();
 app.use(cors());
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3001;
 app.use(bodyParser.json());
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true });
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
@@ -1529,6 +1530,28 @@ app.post('/api/addadmin', async (req, res) => {
     }
 });
 
+//ADMIN RESET USER PASSWORD
+app.post('/api/admin/reset-password', async (req, res) => {
+    const { adminEmail, userEmail, newPassword } = req.body;
+    try {
+        const admin = await Admin.findOne({ email: adminEmail });
+        if (!admin) {
+            return res.json({ success: false, message: 'Unauthorized' });
+        }
+        const user = await User.findOne({ email: userEmail });
+        if (!user) {
+            return res.json({ success: false, message: 'User not found' });
+        }
+        await User.findOneAndUpdate(
+            { email: userEmail },
+            { $set: { password: newPassword } }
+        );
+        res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
 //REMOVE ADMIN
 app.post('/api/removeadmin', async (req, res) => {
     const { email } = req.body;
@@ -2318,6 +2341,12 @@ app.post('/api/deleteuser', async (req, res) => {
     } catch (error) {
         return res.json({ success: false, message: 'Internal Server Error' });
     }
+});
+
+//SERVE FRONTEND
+app.use(express.static(path.join(__dirname, '..', 'ai_course_frontend', 'build')));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'ai_course_frontend', 'build', 'index.html'));
 });
 
 //LISTEN
